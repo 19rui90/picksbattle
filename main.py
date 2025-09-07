@@ -61,7 +61,7 @@ def save_player(player):
 # ===== Simulação de jogadores =====
 players_to_add = [
     {
-        "id": "101",
+        "id": "0",
         "name": "Rui Simões",
         "multiplier": 1.0,
         "country": "Portugal",
