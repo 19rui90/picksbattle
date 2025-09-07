@@ -1,52 +1,150 @@
-import time
 import requests
-from datetime import date
-from supabase import create_client
-from dotenv import load_dotenv
-import os
+import time
+from bs4 import BeautifulSoup
+from datetime import datetime
+import psycopg2  # Supabase PostgreSQL
+import json
 
-# carregar variáveis de ambiente
-load_dotenv()
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+# ----------------------
+# Configurações Supabase
+# ----------------------
+DB_HOST = "YOUR_SUPABASE_HOST"
+DB_NAME = "YOUR_DB_NAME"
+DB_USER = "YOUR_DB_USER"
+DB_PASSWORD = "YOUR_DB_PASSWORD"
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# ----------------------
+# Dicionário de continentes
+# ----------------------
+CONTINENTS = {
+    "Europe": ["Portugal", "France", "Spain", "Germany", "Italy", "Netherlands", "Belgium", "Sweden", "Switzerland", "Denmark", "Ireland", "Greece", "Hungary", "Poland", "Romania", "Scotland", "Northern Ireland", "Wales"],
+    "Asia": ["Japan", "China", "India", "South Korea", "Singapore"],
+    "South America": ["Argentina", "Brazil", "Chile", "Colombia", "Bolivia", "Peru", "Paraguay", "Uruguay", "Venezuela", "Ecuador"],
+    "North America": ["Canada", "United States", "Costa Rica", "Mexico"],
+    "Africa": ["Nigeria", "South Africa", "Morocco", "Egypt"],
+    "Oceania": ["Australia"]
+}
 
-# ===== Função para salvar/atualizar jogador =====
-def save_player(player):
-    supabase.table("players").upsert(player).execute()
-    print(f"Jogador {player['name']} guardado/atualizado!")
+# ----------------------
+# Países e divisões
+# ----------------------
+COUNTRIES = ["Argentina","Australia","Austria","Belgium","Bolivia","Brazil","Bulgaria","Canada","Chile","China","Colombia","Costa Rica","Czech Republic","Denmark","Ecuador","Egypt","England","France","Germany","Greece","Hungary","India","Ireland","Italy","Japan","Mexico","Morocco","Netherlands","Nigeria","Northern Ireland","Norway","Paraguay","Peru","Poland","Portugal","Rest of World","Romania","Scotland","Singapore","Slovakia","South Africa","South Korea","Spain","Sweden","Switzerland","Turkey","United States","Uruguay","Venezuela","Wales"]
 
-# ===== Função para buscar jogadores reais do PicksBattle =====
-def fetch_players():
-    url = "AQUI_VAI_O_ENDPOINT_DOS_JOGADORES"
+DIVISIONS = ["Top Series","Div 1.1","Div 1.2","Div 1.3","Div 2.1","Div 2.2","Div 2.3","Div 2.4","Div 2.5","Div 2.6","Div 2.7","Div 2.8","Div 2.9"]
+
+# ----------------------
+# Funções auxiliares
+# ----------------------
+def get_continent(country):
+    for continent, countries in CONTINENTS.items():
+        if country in countries:
+            return continent
+    return "Unknown"
+
+def fetch_players(country, division):
+    # API principal
+    url = f"https://picksbattle.com/api/leagueTableData?country={country}&division={division}"
     response = requests.get(url)
-    data = response.json()
+    if response.status_code != 200:
+        print(f"Erro ao buscar {country} - {division}")
+        return []
 
+    data = response.json()
     players = []
-    for p in data:  # depende da estrutura do JSON que a API devolver
-        players.append({
-            "id": p["id"],
-            "name": p["name"],
-            "multiplier": p.get("multiplier", 1.0),
-            "country": p.get("country"),
-            "continent": p.get("continent"),
-            "division": p.get("division"),
-            "trophies_total": p.get("trophies_total", 0),
-            "national_league": p.get("national_league", []),
-            "national_cup": p.get("national_cup", []),
-            "champions_cup": p.get("champions_cup", []),
-            "challenge_cup": p.get("challenge_cup", []),
-            "conference_cup": p.get("conference_cup", []),
-            "register_date": p.get("register_date", date.today().isoformat()),
-            "register_season": p.get("register_season")
-        })
+
+    for p in data:
+        player = {
+            "id": p["USER_ID"],
+            "name": p["PLAYER_NAME"],
+            "multiplier": float(p["MULTIPLIER"]),
+            "country": country,
+            "continent": get_continent(country),
+            "division": division,
+            # Inicializa troféus vazios
+            "trophies_total": 0,
+            "national_league": [],
+            "national_cup": [],
+            "champions_cup": [],
+            "challenge_cup": [],
+            "conference_cup": [],
+            "register_date": None,
+            "register_season": None
+        }
+        # HTML scraping do player
+        player_html_url = f"https://picksbattle.com/playercentre?userId={p['USER_ID']}"
+        html_resp = requests.get(player_html_url)
+        if html_resp.status_code == 200:
+            soup = BeautifulSoup(html_resp.text, "html.parser")
+            
+            # Trophies
+            trophies = soup.select(".playerCenter-trophies")
+            for t in trophies:
+                title = t.select_one(".trophy-title-block strong").text.strip()
+                seasons = [s.text.strip() for s in t.select(".season-label")]
+                if title == "National League":
+                    player["national_league"] = seasons
+                elif title == "National Cup":
+                    player["national_cup"] = seasons
+                elif title == "Champions Cup":
+                    player["champions_cup"] = seasons
+                elif title == "Challenge Cup":
+                    player["challenge_cup"] = seasons
+                elif title == "Conference Cup":
+                    player["conference_cup"] = seasons
+            player["trophies_total"] = sum(len(player[key]) for key in ["national_league","national_cup","champions_cup","challenge_cup","conference_cup"])
+            
+            # Register season e date
+            # Aqui podemos pegar da primeira temporada visível ou do HTML de registro
+            player["register_season"] = soup.select_one(".season-label").text.strip() if soup.select_one(".season-label") else None
+            player["register_date"] = datetime.today().date()
+        
+        players.append(player)
     return players
 
-# ===== Loop infinito =====
+def save_to_db(players):
+    conn = psycopg2.connect(host=DB_HOST, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD)
+    cur = conn.cursor()
+    for p in players:
+        cur.execute("""
+        INSERT INTO players (id, name, multiplier, country, continent, division, trophies_total,
+                             national_league, national_cup, champions_cup, challenge_cup, conference_cup,
+                             register_date, register_season)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        ON CONFLICT (id) DO UPDATE SET
+            name=EXCLUDED.name,
+            multiplier=EXCLUDED.multiplier,
+            country=EXCLUDED.country,
+            continent=EXCLUDED.continent,
+            division=EXCLUDED.division,
+            trophies_total=EXCLUDED.trophies_total,
+            national_league=EXCLUDED.national_league,
+            national_cup=EXCLUDED.national_cup,
+            champions_cup=EXCLUDED.champions_cup,
+            challenge_cup=EXCLUDED.challenge_cup,
+            conference_cup=EXCLUDED.conference_cup,
+            register_date=EXCLUDED.register_date,
+            register_season=EXCLUDED.register_season
+        """, (
+            p["id"], p["name"], p["multiplier"], p["country"], p["continent"], p["division"],
+            p["trophies_total"], p["national_league"], p["national_cup"], p["champions_cup"],
+            p["challenge_cup"], p["conference_cup"], p["register_date"], p["register_season"]
+        ))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+# ----------------------
+# Loop principal
+# ----------------------
 while True:
-    jogadores = fetch_players()
-    for j in jogadores:
-        save_player(j)
-    print("✅ Atualização completa, a dormir 60s...")
-    time.sleep(60)
+    for country in COUNTRIES:
+        for division in DIVISIONS:
+            print(f"Buscando jogadores: {country} - {division}")
+            try:
+                players = fetch_players(country, division)
+                save_to_db(players)
+                print(f"{len(players)} jogadores salvos.")
+            except Exception as e:
+                print(f"Erro: {e}")
+    print("Aguardando 15 minutos para próxima atualização...")
+    time.sleep(900)
