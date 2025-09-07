@@ -62,7 +62,7 @@ def save_player(player):
 players_to_add = [
     {
         "id": "0",
-        "name": "Rui Simões",
+        "name": "Teste",
         "multiplier": 1.0,
         "country": "Portugal",
         "continent": "Europe",
