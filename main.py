@@ -49,7 +49,7 @@ def save_player(player):
             "champions_cup": player.get("champions_cup", []),
             "challenge_cup": player.get("challenge_cup", []),
             "conference_cup": player.get("conference_cup", []),
-            "register_date": player.get("register_date", date.today()),
+            "register_date": player.get("register_date", date.today()).isoformat(),
             "register_season": player.get("register_season")
         }).execute()
         print(f"Novo jogador {player['name']} inserido!")
