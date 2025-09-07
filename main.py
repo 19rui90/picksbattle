@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import date
 from supabase import create_client
 
@@ -79,7 +80,10 @@ players_to_add = [
 ]
 
 # ===== Loop para salvar jogadores =====
-for player in players_to_add:
-    save_player(player)
+while True:
+    for player in players_to_add:
+        save_player(player)
+    print("Espera 60 segundos antes da próxima atualização...")
+    time.sleep(60)
 
 print("Script a correr no Render! ✅")
