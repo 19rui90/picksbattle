@@ -14,7 +14,7 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ===== Função para salvar/atualizar jogador =====
 def save_player(player):
     # Verifica se o jogador já existe
-    response = supabase.table("players").select("*").eq("player_id", player["id"]).execute()
+    response = supabase.table("players").select("*").eq("id", player["id"]).execute()
     existing = response.data
 
     if existing:
