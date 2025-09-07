@@ -13,6 +13,10 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ===== Função para salvar/atualizar jogador =====
 def save_player(player):
+    # Garantir que register_date é string ISO
+    if "register_date" in player and isinstance(player["register_date"], date):
+        player["register_date"] = player["register_date"].isoformat()
+
     response = supabase.table("players").select("*").eq("id", player["id"]).execute()
     existing = response.data
 
@@ -49,7 +53,7 @@ def save_player(player):
             "champions_cup": player.get("champions_cup", []),
             "challenge_cup": player.get("challenge_cup", []),
             "conference_cup": player.get("conference_cup", []),
-            "register_date": player.get("register_date", date.today()).isoformat(),
+            "register_date": player.get("register_date", date.today().isoformat()),
             "register_season": player.get("register_season")
         }).execute()
         print(f"Novo jogador {player['name']} inserido!")
