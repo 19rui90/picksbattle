@@ -2,16 +2,15 @@ import requests
 import time
 from bs4 import BeautifulSoup
 from datetime import datetime
-import psycopg2  # Supabase PostgreSQL
+from supabase import create_client
 import json
 
 # ----------------------
 # Configurações Supabase
 # ----------------------
-DB_HOST = "YOUR_SUPABASE_HOST"
-DB_NAME = "YOUR_DB_NAME"
-DB_USER = "YOUR_DB_USER"
-DB_PASSWORD = "YOUR_DB_PASSWORD"
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_KEY")
+supabase = create_client(url, key)
 
 # ----------------------
 # Dicionário de continentes
@@ -105,7 +104,7 @@ def save_to_db(players):
     conn = psycopg2.connect(host=DB_HOST, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD)
     cur = conn.cursor()
     for p in players:
-        cur.execute("""
+        supabase.table("players").upsert(p, on_conflict="id").execute()
         INSERT INTO players (id, name, multiplier, country, continent, division, trophies_total,
                              national_league, national_cup, champions_cup, challenge_cup, conference_cup,
                              register_date, register_season)
