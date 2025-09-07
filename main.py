@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import date
 from supabase import create_client
 
 # ===== Conexão com Supabase =====
@@ -13,48 +13,64 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ===== Função para salvar/atualizar jogador =====
 def save_player(player):
-    # Verifica se o jogador já existe
     response = supabase.table("players").select("*").eq("id", player["id"]).execute()
     existing = response.data
 
     if existing:
-        # Se atributos mudaram, atualiza
-        if existing[0]["stats"] != player["stats"]:
-            supabase.table("players").update({
-                "stats": player["stats"],
-                "updated_at": datetime.utcnow().isoformat()
-            }).eq("player_id", player["id"]).execute()
-            print(f"Jogador {player['name']} atualizado!")
-        else:
-            print(f"Jogador {player['name']} sem alterações.")
+        # Atualiza os campos que possam ter mudado
+        supabase.table("players").update({
+            "name": player["name"],
+            "multiplier": player.get("multiplier"),
+            "country": player.get("country"),
+            "continent": player.get("continent"),
+            "division": player.get("division"),
+            "trophies_total": player.get("trophies_total", 0),
+            "national_league": player.get("national_league", []),
+            "national_cup": player.get("national_cup", []),
+            "champions_cup": player.get("champions_cup", []),
+            "challenge_cup": player.get("challenge_cup", []),
+            "conference_cup": player.get("conference_cup", []),
+            "register_date": player.get("register_date"),
+            "register_season": player.get("register_season")
+        }).eq("id", player["id"]).execute()
+        print(f"Jogador {player['name']} atualizado!")
     else:
         # Inserir novo jogador
         supabase.table("players").insert({
-            "player_id": player["id"],
+            "id": player["id"],
             "name": player["name"],
-            "age": player["age"],
-            "nationality": player["nationality"],
-            "stats": player["stats"],
-            "updated_at": datetime.utcnow().isoformat()
+            "multiplier": player.get("multiplier"),
+            "country": player.get("country"),
+            "continent": player.get("continent"),
+            "division": player.get("division"),
+            "trophies_total": player.get("trophies_total", 0),
+            "national_league": player.get("national_league", []),
+            "national_cup": player.get("national_cup", []),
+            "champions_cup": player.get("champions_cup", []),
+            "challenge_cup": player.get("challenge_cup", []),
+            "conference_cup": player.get("conference_cup", []),
+            "register_date": player.get("register_date", date.today()),
+            "register_season": player.get("register_season")
         }).execute()
         print(f"Novo jogador {player['name']} inserido!")
 
-# ===== Simulação de extração de jogadores =====
-# Substitui esta lista pelo teu scraping ou API real
+# ===== Simulação de jogadores =====
 players_to_add = [
     {
-        "id": 101,
+        "id": "101",
         "name": "Rui Simões",
-        "age": 18,
-        "nationality": "Portugal",
-        "stats": {"attack": 75, "defense": 60, "speed": 80}
-    },
-    {
-        "id": 102,
-        "name": "João Silva",
-        "age": 19,
-        "nationality": "Portugal",
-        "stats": {"attack": 65, "defense": 70, "speed": 75}
+        "multiplier": 1.0,
+        "country": "Portugal",
+        "continent": "Europe",
+        "division": "S1",
+        "trophies_total": 3,
+        "national_league": ["S1"],
+        "national_cup": ["S0"],
+        "champions_cup": [],
+        "challenge_cup": ["S0"],
+        "conference_cup": [],
+        "register_date": date.today(),
+        "register_season": "Season 1"
     }
 ]
 
