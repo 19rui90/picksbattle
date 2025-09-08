@@ -101,36 +101,8 @@ def fetch_players(country, division):
     return players
 
 def save_to_db(players):
-    conn = psycopg2.connect(host=DB_HOST, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD)
-    cur = conn.cursor()
     for p in players:
         supabase.table("players").upsert(p, on_conflict="id").execute()
-        INSERT INTO players (id, name, multiplier, country, continent, division, trophies_total,
-                             national_league, national_cup, champions_cup, challenge_cup, conference_cup,
-                             register_date, register_season)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        ON CONFLICT (id) DO UPDATE SET
-            name=EXCLUDED.name,
-            multiplier=EXCLUDED.multiplier,
-            country=EXCLUDED.country,
-            continent=EXCLUDED.continent,
-            division=EXCLUDED.division,
-            trophies_total=EXCLUDED.trophies_total,
-            national_league=EXCLUDED.national_league,
-            national_cup=EXCLUDED.national_cup,
-            champions_cup=EXCLUDED.champions_cup,
-            challenge_cup=EXCLUDED.challenge_cup,
-            conference_cup=EXCLUDED.conference_cup,
-            register_date=EXCLUDED.register_date,
-            register_season=EXCLUDED.register_season
-        """, (
-            p["id"], p["name"], p["multiplier"], p["country"], p["continent"], p["division"],
-            p["trophies_total"], p["national_league"], p["national_cup"], p["champions_cup"],
-            p["challenge_cup"], p["conference_cup"], p["register_date"], p["register_season"]
-        ))
-    conn.commit()
-    cur.close()
-    conn.close()
 
 # ----------------------
 # Loop principal
